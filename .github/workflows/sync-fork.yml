@@ -1,0 +1,36 @@
+name: Sincronizar fork com o autor original
+
+# Mantém este fork em dia com melgarafael/DeskcommCRM automaticamente, sem
+# depender de ninguém rodar "gh repo sync" na mão. Sem isso, o fork fica para
+# trás em silêncio e o botão "Nova versão" dentro do CRM nunca acha nada novo
+# (o agente de atualização confere tags via `git fetch --tags origin`, e
+# `origin` aqui É este fork).
+on:
+  schedule:
+    - cron: "0 6 * * *"  # todo dia às 06:00 UTC
+  workflow_dispatch: {}   # permite rodar manualmente pelo botão "Run workflow"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar o fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Buscar e enviar branch + tags do original
+        run: |
+          git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
+          git fetch upstream --tags
+
+          git checkout main
+          # Fast-forward apenas: nunca reescreve commit próprio deste fork.
+          git merge --ff-only upstream/main
+
+          git push origin main
+          git push origin --tags
