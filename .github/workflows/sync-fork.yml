@@ -28,9 +28,14 @@ jobs:
           git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
           git fetch upstream --tags
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git checkout main
-          # Fast-forward apenas: nunca reescreve commit próprio deste fork.
-          git merge --ff-only upstream/main
+          # Merge (não fast-forward): este fork tem commits próprios, e o
+          # --ff-only falhava todo dia. Merge preserva os dois lados e nunca
+          # reescreve histórico; se houver conflito, o job falha e avisa.
+          git merge --no-edit upstream/main
 
           git push origin main
           git push origin --tags
