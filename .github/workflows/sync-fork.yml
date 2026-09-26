@@ -4,10 +4,12 @@ name: Sincronizar fork com o autor original
 # depender de ninguém rodar "gh repo sync" na mão. Sem isso, o fork fica para
 # trás em silêncio e o botão "Nova versão" dentro do CRM nunca acha nada novo
 # (o agente de atualização confere tags via `git fetch --tags origin`, e
-# `origin` aqui É este fork).
+# `origin` aqui É este fork). Desde a 1.50 ele também pergunta a RELEASE
+# publicada (`releases/latest` do origin): tag sem release dá 404 e a tela diz
+# "Não consegui checar se há versão nova". Por isso a release é espelhada.
 on:
   schedule:
-    - cron: "0 6 * * *"  # todo dia às 06:00 UTC
+    - cron: "0 */6 * * *"  # a cada 6 horas (o original solta várias versões por dia)
   workflow_dispatch: {}   # permite rodar manualmente pelo botão "Run workflow"
 
 permissions:
@@ -39,3 +41,16 @@ jobs:
 
           git push origin main
           git push origin --tags
+
+      - name: Espelhar a última release publicada do original
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          tag="$(gh release view -R melgarafael/DeskcommCRM --json tagName -q .tagName)"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag já existe no fork."
+            exit 0
+          fi
+          gh release view "$tag" -R melgarafael/DeskcommCRM --json body -q .body > notas.md
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$tag" --notes-file notas.md --latest
