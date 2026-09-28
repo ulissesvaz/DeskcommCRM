@@ -8,6 +8,205 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+## [1.61.0] — 2026-09-28
+
+### Adicionado
+
+- **Módulo opcional para quem vende para empresas — Empresas, Pessoas que decidem e importação de planilha** Quem administra o servidor ganha em Sistema › Módulos opcionais a chave "Empresas e pessoas (venda para empresas)", desligada por padrão. Ligada, o CRM de cada empresa passa a ter o cadastro de Empresas (razão social e CNPJ, com os dados públicos preenchidos pela BrasilAPI), as Pessoas que decidem dentro delas, com vários telefones, e a importação de planilha CSV ou Excel (.xlsx) que cria empresa, pessoa e contato de uma vez. As três telas ficam em CRM › Ver tudo. Desligada, nada muda: as telas, o menu e as rotas não existem, e nenhum CNPJ sai do servidor. Anonimizar um contato também apaga o nome da pessoa ligada a ele e as linhas de planilha que falavam dela, e o pedido de acesso aos dados passa a entregar essas informações. Não há ação para quem opera a VPS.
+
+  Contribuição de @renatofortal (#1621, entrou pelo recorte #1860).
+
+- **Grupos de clientes no chat, com resposta dos atendentes** Em **Conexões**, o botão **Grupos** de cada número conectado por QR Code lista os grupos em que ele está. Cada grupo tem uma chave, e todos vêm desligados. Os grupos ligados aparecem no chat com a etiqueta **Grupo**, mostram quem mandou cada mensagem e podem ser respondidos pelos atendentes como qualquer conversa. Grupo sem atendente fica na fila das pessoas (**Aguardando atendente**), nunca na aba do automático, e um grupo fechado volta a abrir sozinho quando chega mensagem nova. **A IA nunca responde em grupo**, e grupo não vira negócio no funil, não entra em campanha nem em listas de contatos. Só o **administrador** liga grupos pela tela. Ao ligar o primeiro grupo de um número, o WhatsApp dele passa a enviar as mensagens de todos os grupos para o sistema, que descarta os não escolhidos. Ao desligar o último, tudo volta a ser como antes. Entram só as mensagens que chegarem depois de ligar. Áudio e imagem mandados em grupo ficam guardados, mas — diferente do que já acontece numa conversa individual — não são transcritos nem descritos automaticamente. Um pedido de LGPD de quem já é contato alcança também o que essa pessoa escreveu nos grupos ligados: a anonimização apaga essas mensagens e a exportação as entrega; o participante de grupo que não é contato não tem pedido por esta tela.
+
+  Contribuição de @bossprt (#1647).
+
+- **Módulo opcional de Honorários para escritórios de advocacia** Contribuição de @nsbastosconsultoria (#1578). Um módulo opcional, **desligado por padrão**:
+  contrato de honorários de cada caso (fixo, êxito ou misto), calendário de parcelas, e o agente de
+  IA sabendo responder sobre os dois.
+
+  **Instalar.** Quem administra a instalação vai em **Módulos**, no menu do painel da instalação, e
+  instala "Honorários" com um clique. As tabelas do módulo só nascem nessa hora (ADR-0002): quem não
+  instala não carrega tabela nenhuma, não vê porta no menu e o agente não ganha capacidade nova.
+
+  **Usar.** A tela **Análise › Honorários** registra o contrato e as parcelas. Pagar uma parcela lança
+  o valor no caixa da empresa, na conta escolhida, junto com o resto do dinheiro que entra. Um clique
+  duplo em "Pagar" lança uma vez só, e a conta tem de ser da própria empresa.
+  Toda a equipe vê os contratos; criar, alterar e apagar é de gerente ou administrador, e uma
+  parcela paga não se apaga, nem o contrato que a tem.
+
+  **A IA.** O assistente ganha "Ver o contrato de honorários" e "Ver as parcelas", para confirmar o
+  modelo de cobrança e o status de pagamento em vez de estimar um número.
+
+  **LGPD.** O pedido de acesso do titular traz os contratos e as parcelas dos casos dele. Os
+  contratos não guardam dado pessoal (só valores e o vínculo com o caso), então a anonimização não
+  tem o que apagar neles.
+
+### Alterado
+
+- **O README cita a Requesty entre os provedores de IA** A Requesty é provedor do produto desde o #1638, e a linha de IA da tabela de tecnologias do README (português, inglês e espanhol) passa a citá-la. Nada muda no produto nem para quem opera.
+
+  Contribuição de @Thibaultjaigu (#1866).
+
+- **Logo próprio nas telas de acesso respeita o tamanho do arquivo, até 80 px de altura** O logo da marca própria nas telas de entrada, cadastro e recuperação deixa de ter altura fixa de 40 px. Um logo grande passa a ocupar até 80 px de altura (no máximo 192 px de largura), mantendo a proporção. Um logo com menos de 40 px de altura natural deixa de ser ampliado e passa a aparecer **menor** do que antes, no tamanho do arquivo: para ter o logo maior, suba em Marca (`/admin/marca`, a marca da instalação, que é a que as telas de acesso usam) um arquivo com pelo menos 80 px de altura. O logo padrão do produto, usado quando não há marca própria, não muda. Não exige ação para quem não quiser trocar o arquivo.
+
+  Contribuição de @vitorlacerdadigital (#1858).
+
+- **O checkpoint e a abertura do turno saem de inbound-turn.ts para um módulo próprio em abertura/** O arquivo inbound-turn.ts, que concentra o turno de recepção, passou a delegar a dois módulos novos dentro da mesma pasta: abertura/checkpoint.ts guarda o schema do checkpoint, o tipo da linha, a instrução de fechamento, a leitura e a gravação; abertura/ritual.ts guarda o ritual de abertura do turno (ritualBlocks e buildOpeningMessage). O inbound-turn.ts continua importando e reexportando esses símbolos, então quem já os busca por ele — os testes, o follow-up, a resposta de caso, o preview — continua achando os mesmos objetos, sem mudança de comportamento e sem mudança de caminho. A extração é a primeira das três que a issue #636 pede, feita com git mv para o histórico do arquivo acompanhar o módulo novo. Não há ação para quem opera a VPS.
+
+  Contribuição de @webtecnica (#1861).
+
+- **Roteiro de perguntas já concluído não recomeça para o mesmo cliente, a não ser que o roteiro permita** Um roteiro de atendimento que o cliente já respondeu até o fim não volta a fazer as mesmas perguntas quando ele repete a palavra-gatilho, nem quando um roteador de intenção ou o fim de outro roteiro aponta para ele de novo. Antes, repetir a palavra reabria um cadastro já feito. A palavra-gatilho passa a valer para o próximo roteiro que o cliente ainda não concluiu.
+
+  Cada roteiro pode escolher o contrário: no início do roteiro, a opção **Pode recomeçar para quem já concluiu** faz ele começar de novo, útil para roteiros que se repetem, como agendamento. A opção nasce desligada, inclusive nos roteiros que já existem: quem dependia de um roteiro que recomeça precisa ligá-la nele. Um roteiro encerrado por prazo ou interrompido não conta como concluído e pode começar de novo. Não há mudança no banco.
+
+  Contribuição de @vgamkt (#1130, entrou pelo #1865).
+
+### Corrigido
+
+- **O guardião do espanhol reprova t() sobre o que o operador digitou** A catraca de i18n passa a reprovar `t()` aplicado sobre dado que o operador
+  digitou — parâmetro livre de função, não chave de tradução. Foi o defeito do
+  PR 600: "Retorno" virando "Seguimiento". Dado de operador não é chave de
+  dicionário, traduzi-lo muda o dado na tela.
+
+  - 39 sítios reais (35 pares arquivo + expressão) congelados em
+    `DADO_DO_OPERADOR_CONGELADO`, cada entrada com razão escrita; a lista só
+    encolhe: entrada que deixa de casar com sítio é vermelho.
+  - Literal, tabela de módulo e wrapper passa-adireto seguem passando: nenhuma
+    tela legítima começa a reprovar.
+  - Os cegos A e B da issue 603 ficam como próximo passo desta mesma entrega.
+
+  Contribuição de @webtecnica (#1867).
+
+- **A nota interna chega na hora para quem pode ver a conversa, e deixa de aparecer para quem não pode** A nota interna (a escrita no modo **Nota interna**, que nunca vai para o cliente) passa a chegar **em tempo real** para os demais atendentes. Antes ela só aparecia para os outros quando alguém recarregava a página: o canal ficava aberto, mas a tabela não estava publicada, e nada avisava do erro.
+
+  As notas também passam a seguir a **mesma regra de visibilidade da conversa**. Numa organização com "ver as conversas" em `own_and_unassigned` (o padrão), o atendente que não pode abrir uma conversa deixa de ler e de escrever notas nela, e quem perdeu a conversa numa passagem de atendimento deixa de ver as notas dela. Antes, qualquer atendente da organização conseguia ler todas. Viewer, manager e admin continuam vendo as notas de todas as conversas que já veem, e o administrador da plataforma continua vendo tudo.
+
+  Não exige ação de quem instalou.
+
+  Contribuição de @webtecnica (#1868, issue #1863).
+
+- **Follow-up de silêncio para de mandar mensagem a cada poucos minutos para o mesmo contato** Um fluxo de follow-up disparado por silêncio (ex.: "Triagem parada") reinscrevia o mesmo contato a cada rodada do relógio (1×/min), assim que o envio anterior terminava — em vez de esperar o intervalo de silêncio configurado (ex.: 2 horas) entre uma tentativa e outra. Um contato que nunca respondia recebia uma mensagem nova a cada poucos minutos, indefinidamente — medido numa instalação real: 32 disparos em cerca de 9 horas para o mesmo número, risco real de o número ser marcado como spam pelo WhatsApp. Agora a varredura respeita o intervalo configurado entre o fim de uma tentativa e o início da próxima para o mesmo contato no mesmo fluxo. Ninguém precisa reconfigurar nada.
+
+  Contribuição de @nsbastosconsultoria (#1578).
+
+## [1.60.0] — 2026-09-28
+
+### Adicionado
+
+- **O ícone enviado em Marca também identifica o aplicativo instalado** O campo de ícone da instalação passa a usar a mesma imagem na aba do navegador e no app instalado no celular, com tamanhos de 192 e 512 pixels. Sem imagem própria, mantém o desenho da marca. PNG ou JPG até 512 KB, sem editar arquivos no servidor. Crédito: @vitorlacerdadigital.
+
+  Contribuição de @vitorlacerdadigital (#1848).
+
+- **Use uma chave OpenRouter para preparar o acervo de conhecimento** O acervo aceita uma chave OpenRouter cadastrada em IA › Credenciais ou na instalação (`OPENROUTER_API_KEY`) para indexar e consultar documentos com o mesmo modelo de embedding. Em IA › Conhecimento, o aviso de chave faltando permite cadastrá-la sem sair da página. A OpenRouter só entra quando não há chave OpenAI nem gateway: quem já usa OpenAI continua com a configuração anterior.
+
+  Contribuição de @obrunogonzaga (#1854).
+
+- **A empresa passa a ter proposta comercial, do rascunho da IA ao PDF que o cliente recebe no WhatsApp** Nova tela Propostas. É módulo opcional, desligado por padrão, com duas chaves: quem
+  administra o servidor liga "Propostas comerciais" em /admin/sistema › Módulos
+  opcionais (com ela desligada, nenhuma empresa vê a tela, o menu nem as ferramentas
+  do agente), e cada empresa liga a dela em Configurações › Propostas. Ligada, o assistente que conversa com o cliente levanta o briefing antes
+  de rascunhar — objetivo, entregas, o que o cliente já tem e os acessos,
+  responsabilidades, prazo, quem decide e orçamento, e uma referência —, formulando as
+  perguntas com as palavras de cada pedido (serve para site, automação ou projeto sem
+  nicho), mostra um resumo e só cria o rascunho depois que o cliente confirma. O
+  rascunho abre um aviso na Central, aparece em destaque na tela de quem está com o
+  CRM aberto e entra no Radar como "proposta esperando revisão"; nada sai para o
+  cliente sem uma pessoa revisar. A empresa escolhe os modelos em Configurações ›
+  Propostas › Modelos: pode desligar os que vêm com o sistema, editar, criar os dela
+  e importar o PDF ou o texto que já usa — a IA divide em seções, troca por campos o
+  que muda de um cliente e de um projeto para outro, e mostra o que o modelo vai pedir
+  antes de salvar. No editor, "Preencher com a conversa" sugere valores para os campos
+  em aberto (você confirma cada um), cada seção pode ser reescrita, e "Ver como o
+  cliente recebe" abre o PDF exatamente como ele vai chegar. O envio exige modelo
+  confirmado e preços definidos, grava o que foi digitado antes de enviar, numera a
+  proposta por organização e ano, e manda o PDF pelo WhatsApp da empresa, com a marca
+  dela. Anonimizar um contato (LGPD) também apaga do armazenamento o PDF das propostas
+  dele, e o relatório de acesso aos dados passa a listá-las. Nada exige ação de quem
+  opera a instalação: quem não liga o módulo não vê diferença nenhuma.
+
+  Contribuição de @paulolimajr77 (#1832).
+
+- **A venda que veio de anúncio pode ir para a Meta pelo próprio canal intermediado, atrás de uma chave que vem desligada** Contribuição de @jmpo (#1819).
+
+  Quando o número de WhatsApp está conectado por um canal intermediado que já
+  liga o conjunto de dados da Meta ao número (na tela do próprio provedor), a
+  venda fechada no CRM — botão Ganhar, arrasto no quadro ou mover em lote —
+  pode ser reportada por esse canal: o evento `Purchase` sai com o valor, a
+  moeda, o telefone e o id da conversa, e o provedor completa o vínculo com o
+  clique do anúncio.
+
+  **Vem desligado.** Nada muda na atualização: o envio só acontece depois que um
+  administrador liga **Enviar vendas pelo canal da conversa** em Configurações ›
+  Conversões. Com a chave desligada, nenhum dado da venda sai para o provedor e
+  a venda segue na pendência "sem conexão" de sempre.
+
+  Com a chave ligada, o canal só entra quando a organização não tem conexão
+  direta com a Meta; quem já configurou a conexão direta segue por ela. A venda
+  sai por um caminho só, e a resposta do canal é lida por inteiro — um evento
+  recusado dentro de uma resposta de sucesso aparece como recusa na tela de
+  conversões, não como enviado.
+
+### Alterado
+
+- **O menu mostra quantos casos e quantas conversas esperam uma pessoa** «Casos» passa a aparecer no menu lateral do grupo de IA, com um número vermelho
+  quando há casos em que a IA espera uma pessoa. Antes a tela ficava atrás de
+  «Ver tudo em IA», e o caso só era visto por quem fosse procurar. O item «Inbox»
+  ganha o mesmo número para as conversas que esperam uma pessoa (a aba Fila) —
+  as que a IA passou para a equipe. Sem nada esperando, não aparece número.
+
+  Para o menu continuar cabendo na tela de um notebook, «Roteadores» — que se
+  configura poucas vezes — passa a ficar em «Ver tudo em IA».
+
+  Contribuição de @jmpo (#1817).
+
+- **Um gate novo compara o tipo da coluna no banco com o tipo declarado no TypeScript** O repositório ganhou um invariante novo, tests/invariants/tipo-de-coluna-x-typescript.test.ts,
+  que compara o TIPO de cada coluna lido do supabase/baseline.sql com o tipo declarado
+  na interface do TypeScript, nulidade incluída, e impede que o tipo de uma linha venha
+  através de as unknown as, que é o que desliga a checagem do compilador na hora em que
+  o dado entra. Ele é o irmão do vocabulario-banco-x-typescript, que compara o CHECK:
+  juntos cobrem as duas metades do contrato entre o banco e o código. A cobertura
+  inicial é a view ai_provider_credentials_safe contra a interface CredentialRow,
+  que é onde nasceu o achado da issue #533. Nada é transcrito de um lado para o
+  outro: o banco sai do baseline versionado e o TypeScript sai do próprio arquivo da
+  interface, e toda falha de extração passa a recusar em vez de devolver lista vazia.
+  Dois defeitos reais que o gate reprovara foram corrigidos junto: a coluna
+  api_key_last4 é NOT NULL no baseline e estava declarada como anulável no TypeScript,
+  e os três as unknown as CredentialRow[] das telas de Credenciais e de Agentes viraram
+  a asserção verificável as CredentialRow[], que o TypeScript confere. Não há ação
+  para quem opera a VPS.
+
+  Contribuição de @webtecnica (#1850).
+
+- **Os testes do envio de mensagem usam um dublê só** Os quatro testes do `sendMessageHandler` que ainda montavam o banco à mão passam a usar o dublê compartilhado, e a lista de exceções do gate que exige isso fica vazia: dublê novo feito à mão reprova. Nada muda no produto nem para quem opera.
+
+  Contribuição de @webtecnica (#1843, issue #286).
+
+- **Todo identificador que sai para um serviço de fora tem o limite do serviço conferido em teste** Um registro único lista as fronteiras (nome de sessão do WAHA, chave no Storage, `Idempotency-Key`, cabeçalhos do webhook de saída, sessão WaCalls, `external_id`), cada uma com o limite ou a forma que o serviço impõe e a fonte. O limite do WAHA vem da mesma constante que o código usa, e uma varredura reprova um envio novo para o Storage ou uma chave de idempotência nova que fique fora do registro. Nada muda no produto nem para quem opera.
+
+  Contribuição de @webtecnica (#1851, issue #686).
+
+### Corrigido
+
+- **A resposta enviada pelo CRM não aparece mais duas vezes na conversa** Quando o WhatsApp devolvia o eco de uma mensagem enviada pelo CRM (pelo atendente ou pela IA) quase ao mesmo tempo em que o envio era confirmado, a mesma frase podia aparecer duas vezes na conversa. O eco agora é registrado com o mesmo identificador do envio, e o banco recusa a segunda linha. Mensagens duplicadas antes desta versão continuam no histórico. Nenhuma ação é necessária no servidor.
+
+  Contribuição de @webtecnica (#1855).
+
+- **As telas de convite, de erro e as páginas legais declaram o idioma em que estão escritas** Sete telas já apareciam traduzidas, mas diziam ao navegador que estavam em português: o convite para entrar na equipe, as páginas legais, as de acesso negado (403 e a do painel da instalação), a de erro interno (500), a de conta suspensa e a de acesso revogado. Para quem usa o sistema em espanhol, o leitor de tela lia o texto com a pronúncia do português, e o navegador oferecia traduzir "do português" uma página que já estava em espanhol. No convite, era a primeira tela que o convidado via. Agora essas telas declaram o idioma do texto, como as demais já faziam. Não há nada a fazer na atualização.
+
+  Contribuição de @FabioMundoDigital (#1853).
+
+- **O app instalado usa o nome configurado na marca da instalação** O diálogo de instalação do aplicativo no navegador passa a ler o nome configurado na instalação, em vez de manter o nome da compilação da imagem. A correção preserva as configurações existentes e não exige editar arquivos no servidor. Crédito: @vitorlacerdadigital.
+
+  Contribuição de @vitorlacerdadigital (#1847, fecha #1845).
+
+- **O vigia de saúde ignora a sessão de teste do e2e em vez de vigiá-la como conexão** Os seeds do e2e gravam em `channel_sessions` e nada apaga a linha, então entre uma suíte e outra a conexão de teste continua lá, parada. O cron de saúde varre a tabela, pergunta ao transporte e, com `STOPPED` entre os status que avisam, abria um aviso na Central de quem opera — resíduo de teste virando alarme permanente numa instalação de verdade. A faixa do topo anunciava o mesmo caso, dizendo que nenhuma mensagem entra nem sai por aquela conexão.
+
+  Agora os dois caminhos reconhecem a categoria antes de agir: o cron conta a linha como ignorada sem perguntar nada a ela, e a faixa não a anuncia. A lista é a MESMA que a limpeza de fim de suíte apaga, e mora em `lib/channels/sessoes-e2e.ts` — num só lugar, para não haver uma cópia envelhecendo ao lado da outra. Quem não está na lista continua vigiado e anunciado como sempre, inclusive quando está mesmo caído.
+
+  Este fragmento não cobre a limpeza do resíduo que já existe em instalação (é o script do PR #1051) nem o religamento de sessão parada.
+
+  Contribuição de @webtecnica (#1844, issue #1032).
+
 ## [1.59.0] — 2026-09-28
 
 ### Adicionado
@@ -9100,7 +9299,9 @@ Primeira versão marcada do DeskcommCRM. O projeto vinha sendo desenvolvido publ
 
 - **Node 22 é obrigatório para desenvolvimento.** A suíte de invariantes instancia o cliente do Supabase, que exige o `WebSocket` global — nativo apenas a partir do Node 22. Isso não afeta quem apenas hospeda: a VPS roda a imagem pronta.
 
-[Não lançado]: https://github.com/melgarafael/DeskcommCRM/compare/v1.59.0...HEAD
+[Não lançado]: https://github.com/melgarafael/DeskcommCRM/compare/v1.61.0...HEAD
+[1.61.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.60.0...v1.61.0
+[1.60.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.59.0...v1.60.0
 [1.59.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.58.1...v1.59.0
 [1.58.1]: https://github.com/melgarafael/DeskcommCRM/compare/v1.58.0...v1.58.1
 [1.58.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.57.0...v1.58.0
