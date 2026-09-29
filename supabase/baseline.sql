@@ -7297,26 +7297,10 @@ alter table followup_flow_pointers enable row level security;
 alter table followup_enrollments enable row level security;
 alter table followup_enrollment_events enable row level security;
 
-do $$ begin
-  create policy tenant_isolation_followup_flow_versions_all on followup_flow_versions
-    for all using (organization_id in (select fn_user_org_ids()))
-    with check (organization_id in (select fn_user_org_ids()));
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy tenant_isolation_followup_flow_pointers_all on followup_flow_pointers
-    for all using (organization_id in (select fn_user_org_ids()))
-    with check (organization_id in (select fn_user_org_ids()));
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy tenant_isolation_followup_enrollments_all on followup_enrollments
-    for all using (organization_id in (select fn_user_org_ids()))
-    with check (organization_id in (select fn_user_org_ids()));
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy tenant_isolation_followup_enrollment_events_all on followup_enrollment_events
-    for all using (organization_id in (select fn_user_org_ids()))
-    with check (organization_id in (select fn_user_org_ids()));
-exception when duplicate_object then null; end $$;
+-- As policies `for all` das quatro tabelas saíram daqui: followup_flow_pointers e
+-- followup_enrollments na migration 0489 (issue #1913), followup_flow_versions e
+-- followup_enrollment_events na 0490 (issue #1915). As policies por operação estão nos
+-- apêndices delas.
 
 -- Claim atômico do worker (SKIP LOCKED) — service role only
 create or replace function fn_claim_due_followup_enrollments(p_limit int, p_lease_seconds int)
@@ -20632,6 +20616,17 @@ grant execute on function public.fn_appointment_enrollment_current(uuid,uuid,tex
 create or replace function public.fn_followup_generation_write()
 returns trigger language plpgsql security definer set search_path=public as $$
 begin
+ -- #1862 — DELETE que chega em CASCATA não é escrita de follow-up. Este gatilho
+ -- é BEFORE ROW: o DELETE vindo de `on delete cascade` roda sob o gatilho da
+ -- chave estrangeira, com `pg_trigger_depth() > 1`. Passa QUALQUER cascata, não
+ -- só a da ficha: apagar o contato, a inscrição (followup_enrollments), o fluxo
+ -- (followup_flow_pointers) ou a organização leva junto os registros internos.
+ -- O turno que sobra sem inscrição/evento falha fechado em
+ -- fn_followup_job_current. A profundidade não distingue cascata de DELETE
+ -- feito por outro gatilho: hoje nenhum gatilho apaga nestas duas tabelas, e
+ -- quem criar um herda esta passagem. O DELETE DIRETO (profundidade 1, com
+ -- `auth.uid()`) continua caindo na recusa abaixo — a 42501 não afrouxa.
+ if tg_op='DELETE' and pg_trigger_depth()>1 then return old; end if;
  if tg_table_name='job_queue' then
   if auth.uid() is not null and ((tg_op<>'DELETE' and new.kind='followup_turn') or (tg_op<>'INSERT' and old.kind='followup_turn')) then
    raise exception 'followup_job_internal' using errcode='42501';
@@ -42858,6 +42853,139 @@ create trigger trg_lgpd_secoes_de_modulo
   for each row
   when (new.is_anonymized and not old.is_anonymized)
   execute function public.fn_lgpd_redigir_secoes_de_modulo();
+
+-- ---- Exclusão de contato com turno de follow-up: ficha inteira (migration 0488) ----
+-- Issue #1862: a rota apagava `messages`, `conversations` e `contacts` em três
+-- chamadas separadas, e o `contacts` era recusado com 42501 pelo gatilho de
+-- follow-up quando a ficha tinha turno — histórico apagado, ficha ficando.
+-- A função nova abaixo é a chamada ÚNICA que a rota passa a fazer: as três
+-- saem numa transação só. SECURITY INVOKER de propósito, como os três DELETE
+-- separados que ela substitui: a RLS de quem chama continua valendo, e
+-- `p_organization_id` fecha a linha por dentro — sem service role.
+-- O conserto da outra metade (a guarda do gatilho, `pg_trigger_depth() > 1`)
+-- está no bloco da 0224, EDITADO NO LUGAR, porque é a MESMA função.
+create or replace function public.fn_apagar_contato_com_historico(
+  p_contact_id uuid,
+  p_organization_id uuid
+)
+returns boolean
+language plpgsql
+volatile
+security invoker
+set search_path to 'public', 'pg_temp'
+as $$
+begin
+  -- RESTRICT da #752: o histórico sai antes da ficha, na mesma transação.
+  delete from public.messages
+   where contact_id = p_contact_id
+     and organization_id = p_organization_id;
+
+  delete from public.conversations
+   where contact_id = p_contact_id
+     and organization_id = p_organization_id;
+
+  delete from public.contacts
+   where id = p_contact_id
+     and organization_id = p_organization_id;
+
+  -- `found` é do DELETE da ficha: false = a ficha não estava acessível para quem
+  -- chamou (outra organização, RLS, corrida) — a rota devolve 404 nesse caso.
+  return found;
+end;
+$$;
+
+-- Função nova em `public` nasce exposta (ALTER DEFAULT PRIVILEGES do dump):
+-- o revoke tira anon e o grant deixa só quem a rota usa.
+revoke execute on function public.fn_apagar_contato_com_historico(uuid, uuid) from public, anon;
+grant  execute on function public.fn_apagar_contato_com_historico(uuid, uuid) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+-- ---- followup_enrollments e followup_flow_pointers: RLS por operação (migration 0489) ----
+-- A policy `for all` sem papel mínimo deixava `viewer` apagar inscrição e fluxo pelo PostgREST,
+-- e a cascata levava turnos e trilha (issue #1913; o PR #1912 abriria o buraco inteiro).
+-- Escrita = `manager`, como as rotas. Não cria função. Corpo e porquê: a migration 0489.
+
+drop policy if exists tenant_isolation_followup_enrollments_all on public.followup_enrollments;
+
+drop policy if exists followup_enrollments_select on public.followup_enrollments;
+create policy followup_enrollments_select on public.followup_enrollments
+  for select using (organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists followup_enrollments_insert on public.followup_enrollments;
+create policy followup_enrollments_insert on public.followup_enrollments
+  for insert
+  with check (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists followup_enrollments_update on public.followup_enrollments;
+create policy followup_enrollments_update on public.followup_enrollments
+  for update
+  using (organization_id in (select public.fn_user_org_ids())
+         and public.fn_role_at_least(organization_id, 'manager'))
+  with check (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists followup_enrollments_delete on public.followup_enrollments;
+create policy followup_enrollments_delete on public.followup_enrollments
+  for delete
+  using (organization_id in (select public.fn_user_org_ids())
+         and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists tenant_isolation_followup_flow_pointers_all on public.followup_flow_pointers;
+
+drop policy if exists followup_flow_pointers_select on public.followup_flow_pointers;
+create policy followup_flow_pointers_select on public.followup_flow_pointers
+  for select using (organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists followup_flow_pointers_insert on public.followup_flow_pointers;
+create policy followup_flow_pointers_insert on public.followup_flow_pointers
+  for insert
+  with check (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists followup_flow_pointers_update on public.followup_flow_pointers;
+create policy followup_flow_pointers_update on public.followup_flow_pointers
+  for update
+  using (organization_id in (select public.fn_user_org_ids())
+         and public.fn_role_at_least(organization_id, 'manager'))
+  with check (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists followup_flow_pointers_delete on public.followup_flow_pointers;
+create policy followup_flow_pointers_delete on public.followup_flow_pointers
+  for delete
+  using (organization_id in (select public.fn_user_org_ids())
+         and public.fn_role_at_least(organization_id, 'manager'));
+
+-- ---- followup_enrollment_events e followup_flow_versions: RLS por operação (migration 0490) ----
+-- A policy `for all` sem papel mínimo deixava `viewer` apagar ou reescrever a trilha de uma
+-- inscrição e as versões de um fluxo pelo PostgREST (issue #1915). Escrita só onde uma rota
+-- escreve pela sessão (`manager`); o resto fica com o motor. Corpo e porquê: a migration 0490.
+
+drop policy if exists tenant_isolation_followup_enrollment_events_all on public.followup_enrollment_events;
+
+drop policy if exists followup_enrollment_events_select on public.followup_enrollment_events;
+create policy followup_enrollment_events_select on public.followup_enrollment_events
+  for select using (organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists followup_enrollment_events_insert on public.followup_enrollment_events;
+create policy followup_enrollment_events_insert on public.followup_enrollment_events
+  for insert
+  with check (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, 'manager'));
+
+drop policy if exists tenant_isolation_followup_flow_versions_all on public.followup_flow_versions;
+
+drop policy if exists followup_flow_versions_select on public.followup_flow_versions;
+create policy followup_flow_versions_select on public.followup_flow_versions
+  for select using (organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists followup_flow_versions_delete on public.followup_flow_versions;
+create policy followup_flow_versions_delete on public.followup_flow_versions
+  for delete
+  using (organization_id in (select public.fn_user_org_ids())
+         and public.fn_role_at_least(organization_id, 'manager'));
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
