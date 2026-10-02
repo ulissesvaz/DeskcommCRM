@@ -309,6 +309,21 @@ describe("os elos que somem sem barulho", () => {
     const cron = readFileSync("app/api/v1/cron/channel-health/route.ts", "utf8");
     expect(cron).not.toMatch(/"waha"|'waha'|meta_cloud|zernio/);
   });
+
+  it("o motivo da queda chega ao banco — não só ao aviso", () => {
+    // `checkHealth` apura `detail` (ex.: `meta_100_33`, `conta_em_erro`) e
+    // `avisoDaConexao` já o usa no CORPO do aviso — mas o `update` que grava o
+    // novo status em `channel_sessions` gravava só `status`, nunca
+    // `status_reason`. Medido numa org real: 3 quedas seguidas da mesma conexão,
+    // as 3 com `status_reason` vazio no banco, mesmo quando o provider tinha
+    // respondido com um código específico. Regex sobre o PAYLOAD do update, não
+    // sobre a variável `saude` solta no arquivo — que passaria verde mesmo se o
+    // campo nunca saísse do `.detail` apurado.
+    const cron = readFileSync("app/api/v1/cron/channel-health/route.ts", "utf8");
+    expect(cron).toMatch(
+      /\.update\(\{\s*status:\s*saude\.status,\s*status_reason:\s*saude\.detail,/,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
