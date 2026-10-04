@@ -4533,13 +4533,11 @@ GRANT ALL ON TABLE "public"."ai_budgets" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."ai_chunks" TO "anon";
 GRANT ALL ON TABLE "public"."ai_chunks" TO "authenticated";
 GRANT ALL ON TABLE "public"."ai_chunks" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."ai_faq_items" TO "anon";
 GRANT ALL ON TABLE "public"."ai_faq_items" TO "authenticated";
 GRANT ALL ON TABLE "public"."ai_faq_items" TO "service_role";
 
@@ -4551,13 +4549,11 @@ GRANT ALL ON TABLE "public"."ai_invocations" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."ai_knowledge_sources" TO "anon";
 GRANT ALL ON TABLE "public"."ai_knowledge_sources" TO "authenticated";
 GRANT ALL ON TABLE "public"."ai_knowledge_sources" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."ai_knowledge_versions" TO "anon";
 GRANT ALL ON TABLE "public"."ai_knowledge_versions" TO "authenticated";
 GRANT ALL ON TABLE "public"."ai_knowledge_versions" TO "service_role";
 
@@ -10929,10 +10925,10 @@ $$;
 revoke all     on function public.fn_demanda_fecha_com_conversa() from public;
 revoke execute on function public.fn_demanda_fecha_com_conversa() from anon, authenticated;
 
-drop trigger if exists trg_demanda_fecha_com_conversa on public.conversations;
-create trigger trg_demanda_fecha_com_conversa
-  after update of status on public.conversations
-  for each row execute function public.fn_demanda_fecha_com_conversa();
+-- O gatilho desta função saiu daqui: era criado e derrubado adiante SEM
+-- recriação, e o `update.sh` reinstalava o gatilho velho a cada passada. O
+-- `drop trigger if exists` do bloco da 0222 continua, para limpar quem o
+-- recebeu de um baseline antigo.
 
 
 notify pgrst, 'reload schema';
@@ -17051,6 +17047,9 @@ create policy tenant_isolation_ai_chunks_write on public.ai_chunks
     or public.fn_is_platform_admin_full()
   );
 
+-- Estas quatro nunca foram para o anon: a concessão que o dump trazia saiu
+-- do texto — ela era reaplicada a cada install/update só para ser revogada
+-- aqui, e uma atualização que morresse no meio deixava o anon com ALL.
 revoke all on table public.ai_knowledge_sources  from anon;
 revoke all on table public.ai_knowledge_versions from anon;
 revoke all on table public.ai_chunks             from anon;
@@ -44690,6 +44689,53 @@ $$;
 revoke execute on function public.fn_solicitar_reenvio_conversao(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.fn_solicitar_reenvio_conversao(uuid, uuid, text) to service_role;
 
+-- ---- a remarcação carimba quando o horário foi marcado (migration 0536) ----
+-- Issue #2230, seguimento da #2226/#2223: a régua do degrau vencido na marcação
+-- é `calendar_appointments.created_at`, e `created_at` não muda quando a reunião
+-- é REMARCADA. Reunião criada 3 dias antes e remarcada às 18:30 para as 16h do
+-- dia seguinte mantém a véspera (1440 min) "vencida desde 16:00 de hoje" e a
+-- primeira varredura depois da remarcação manda o aviso — o mesmo defeito da
+-- #2223 com outro gatilho. Medido na issue: varredura às 18:35 → `[1440]`.
+--
+-- A coluna guarda o instante em que o `starts_at` ATUAL foi gravado. As duas
+-- alternativas foram medidas antes de escolher (corpo da migration 0536):
+-- `updated_at` descartaria degraus ARMADOS (o link do Meet e cada revisão o
+-- reescrevem) e `revision_started_at` vira com status e conversa, matando a
+-- véspera de um compromisso confirmado já dentro de 24h.
+--
+-- O carimbo mora num GATILHO: a remarcação entra pela tela, pela ferramenta MCP
+-- e pela reconciliação do Google, e todas passam por `fn_appointment_change_core`
+-- — mas o gatilho é o único ponto que não depende de quem escreve lembrar de
+-- gravar. O guard é `is distinct from` porque o UPDATE do RPC SEMPRE nomeia
+-- `starts_at` no SET, mesmo quando o patch não o traz: nomear não é mudar.
+--
+-- Aditiva e idempotente; sem backfill — linha nunca remarcada fica `NULL` e o
+-- leitor (`app/api/v1/cron/agenda-reminder/route.ts`) cai em `created_at`, que é
+-- o comportamento de antes. A função entra ANTES da varredura anon de propósito.
+alter table public.calendar_appointments
+  add column if not exists starts_at_marked_at timestamptz;
+
+comment on column public.calendar_appointments.starts_at_marked_at is
+  'Instante em que o starts_at ATUAL foi gravado — a régua do degrau de lembrete vencido na marcação (#2223) depois de uma remarcação (#2230). NULL = a linha nunca foi remarcada; quem lê (a rota agenda-reminder) cai em created_at.';
+
+create or replace function public.fn_starts_at_marked_at() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.starts_at is distinct from old.starts_at then
+    new.starts_at_marked_at := clock_timestamp();
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.fn_starts_at_marked_at() from public, anon, authenticated;
+grant execute on function public.fn_starts_at_marked_at() to service_role;
+
+drop trigger if exists trg_starts_at_marked_at on public.calendar_appointments;
+create trigger trg_starts_at_marked_at
+  before update of starts_at on public.calendar_appointments
+  for each row execute function public.fn_starts_at_marked_at();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -46529,3 +46575,22 @@ update public.crm_leads l
    and a.source_module = 'canal.ingest'
    and c.channel <> 'whatsapp'
    and l.source = 'whatsapp';
+
+-- ---- tipo do envio no trace (migration 0535) ----
+-- O trace passa a dizer se a tentativa vetada era RESPOSTA ou DISPARO (#2112).
+-- NULL-ável de propósito: linha anterior à 0535 é legado e continua lida como
+-- resposta (o que o código de antes assumia); `null` passa no CHECK. CHECK de
+-- vocabulário fechado (`resposta`/`disparo`), espelho de `TipoDeEnvio` em
+-- lib/agent-engine/guardrails/before-send.ts. Idempotente.
+alter table public.before_send_traces
+  add column if not exists tipo_envio text;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint
+                  where conname = 'before_send_traces_tipo_envio_check'
+                    and conrelid = 'public.before_send_traces'::regclass) then
+    alter table public.before_send_traces
+      add constraint before_send_traces_tipo_envio_check
+      check (tipo_envio in ('resposta', 'disparo'));
+  end if;
+end $$;
