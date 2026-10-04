@@ -1931,6 +1931,16 @@ export const DICIONARIO: Traducoes = {
   "Um de cada vez por cliente": { es: "Una a la vez por cliente" },
   "Só atender em horário de funcionamento": { es: "Atender solo en horario de funcionamiento" },
   "Só enviar follow-up nestes horários": { es: "Enviar seguimientos solo en estos horarios" },
+  "Mensagem fora do horário (opcional)": { es: "Mensaje fuera del horario (opcional)" },
+  "Ex.: Nosso atendimento funciona de segunda a sexta, das 8h às 18h. Recebemos sua mensagem e respondemos no próximo horário de atendimento.": {
+    es: "Ej.: Nuestra atención funciona de lunes a viernes, de 8h a 18h. Recibimos su mensaje y respondemos en el próximo horario de atención.",
+  },
+  "Quando o cliente escrever fora do horário, esta mensagem é enviada na hora — uma vez por cliente por período fechado, e nunca para quem pediu para parar. Deixe em branco para não enviar.": {
+    es: "Cuando el cliente escriba fuera del horario, este mensaje se envía al instante — una vez por cliente por período cerrado, y nunca para quien pidió dejar de recibir. Déjelo en blanco para no enviar.",
+  },
+  "Funil de destino (opcional)": { es: "Embudo de destino (opcional)" },
+  "Sem destino — só escolher o agente": { es: "Sin destino — solo elegir el agente" },
+  "Primeira etapa aberta": { es: "Primera etapa abierta" },
   Início: { es: "Inicio" },
   Fim: { es: "Fin" },
   Dias: { es: "Días" },
@@ -2761,6 +2771,10 @@ export const DICIONARIO: Traducoes = {
     es: "No encontré texto en este archivo. Si es un PDF escaneado, exporta la propuesta original como PDF con texto.",
   },
   "Modelos de proposta": { es: "Modelos de propuesta" },
+  "As propostas estão desligadas para esta organização. Para editar os modelos, ligue as propostas em Configurações › Propostas e salve.": {
+    es: "Las propuestas están desactivadas para esta organización. Para editar los modelos, activa las propuestas en Configuración › Propuestas y guarda.",
+  },
+  "Ir para Configurações › Propostas": { es: "Ir a Configuración › Propuestas" },
   "Personalize os modelos da plataforma ou crie os da sua empresa, inclusive a partir de uma proposta que você já usa.": {
     es: "Personaliza los modelos de la plataforma o crea los de tu empresa, incluso a partir de una propuesta que ya usas.",
   },
@@ -7945,6 +7959,10 @@ export const DICIONARIO: Traducoes = {
     es: "El envío de este paso se descartó porque la cuenta fue suspendida",
   },
   "sai num envio novo quando a conta for reativada": { es: "sale en un envío nuevo cuando se reactive la cuenta" },
+  "O envio deste passo foi descartado porque a inscrição está pausada": {
+    es: "El envío de este paso se descartó porque la inscripción está pausada",
+  },
+  "sai num envio novo quando a inscrição for retomada": { es: "sale en un envío nuevo cuando se reanude la inscripción" },
   "Mensagem enviada": { es: "Mensaje enviado" },
   "Segurou o fluxo por causa de um retorno agendado": {
     es: "Frenó el flujo por un regreso programado",
@@ -8743,6 +8761,15 @@ export const DICIONARIO: Traducoes = {
     es: "Muestra limitada: esta cifra cubre solo una parte del período.",
   },
   "Falha ao ler o histórico de etapas.": { es: "Error al leer el historial de etapas." },
+  "Falha ao ler os negócios das etapas.": { es: "Error al leer los negocios de las etapas." },
+  // ─── Tempo na etapa ATUAL (#2032), ao lado da taxa da #1753 ──────────────
+  "nesta etapa agora": { es: "en esta etapa ahora" },
+  "mediana de {horas} h desde a entrada (stage_changed_at)": {
+    es: "mediana de {horas} h desde la entrada (stage_changed_at)",
+  },
+  "Amostra limitada: este número cobre só parte dos negócios abertos do funil.": {
+    es: "Muestra limitada: esta cifra cubre solo una parte de los negocios abiertos del embudo.",
+  },
   "Ver o porquê.": { es: "Ver el porqué." },
   "ver a mensagem": { es: "ver el mensaje" },
   "registro que sustenta": { es: "registro que sustenta" },
@@ -10527,6 +10554,11 @@ export const DICIONARIO: Traducoes = {
   "…e mais": { es: "…y más" },
   "Código": { es: "Código" },
   "Preço de venda": { es: "Precio de venta" },
+  "Produto atualizado": { es: "Producto actualizado" },
+  "Sincronizado de": { es: "Sincronizado de" },
+  "Edite na origem: o que você mudar aqui é sobrescrito na próxima sincronização.": {
+    es: "Edita en el origen: lo que cambies aquí se vuelve a sobrescribir en la próxima sincronización.",
+  },
   "(opcional)": { es: "(opcional)" },
   "Serve para o atendente saber até onde pode negociar. Não aparece para o cliente.": {
     es: "Sirve para que el asistente sepa hasta dónde puede negociar. No se muestra al cliente.",
@@ -12985,6 +13017,11 @@ export const DICIONARIO: Traducoes = {
   Links: { es: "Enlaces" },
   "Abrir no WhatsApp": { es: "Abrir en WhatsApp" },
   "Ver ficha completa do contato": { es: "Ver la ficha completa del contacto" },
+  // ─── #1506 F1: as outras pessoas do negócio, abaixo do contato principal ───
+  "Pessoas relacionadas": { es: "Personas relacionadas" },
+  "Não consegui carregar as pessoas relacionadas.": {
+    es: "No pude cargar las personas relacionadas.",
+  },
   "Confira os links marcados: só endereços http(s) valem.": {
     es: "Revisa los enlaces marcados: solo son válidas las direcciones http(s).",
   },
@@ -13136,6 +13173,26 @@ export const DICIONARIO: Traducoes = {
     es: "Clientes persona jurídica y los contactos de cada uno.",
   },
   "Nova empresa": { es: "Nueva empresa" },
+  // Ciclo B2B da issue #1937: consulta de CNPJ antes de criar, edição e
+  // exclusão segura na tela de detalhe.
+  "Consultar CNPJ": { es: "Consultar CNPJ" },
+  "Consultando…": { es: "Consultando…" },
+  "Dados públicos preenchidos. Revise antes de criar.": {
+    es: "Datos públicos rellenados. Revíselos antes de crear.",
+  },
+  "Já existe uma empresa com este CNPJ nesta organização. Revise antes de criar.": {
+    es: "Ya existe una empresa con este CNPJ en esta organización. Revísela antes de crear.",
+  },
+  "Não foi possível consultar o CNPJ.": { es: "No fue posible consultar el CNPJ." },
+  Rua: { es: "Calle" },
+  Bairro: { es: "Barrio" },
+  Cidade: { es: "Ciudad" },
+  Complemento: { es: "Complemento" },
+  "Excluir empresa": { es: "Eliminar empresa" },
+  "Não foi possível excluir.": { es: "No fue posible eliminar." },
+  "A exclusão apaga o cadastro da empresa. Se houver pessoas vinculadas, a exclusão é recusada e a tela mostra o motivo; nada é apagado.": {
+    es: "La eliminación borra el registro de la empresa. Si hay personas vinculadas, la eliminación se rechaza y la pantalla muestra el motivo; no se borra nada.",
+  },
   "Buscar por nome, fantasia ou CNPJ…": { es: "Buscar por nombre, fantasía o CNPJ…" },
   "Erro ao carregar empresas.": { es: "Error al cargar empresas." },
   "Nenhuma empresa ainda.": { es: "Ninguna empresa todavía." },
@@ -13873,6 +13930,7 @@ export const DICIONARIO: Traducoes = {
   "Chamar uma skill": { es: "Llamar una skill" },
   "Iniciar outro fluxo de atendimento": { es: "Iniciar otro flujo de atención" },
   "O fluxo de atendimento escolhido não existe nesta organização.": { es: "El flujo de atención elegido no existe en esta organización." },
+  "O funil ou a etapa de destino não existe nesta organização.": { es: "El embudo o la etapa de destino no existe en esta organización." },
   "Como usar os fluxos de atendimento (guia rápido)": { es: "Cómo usar los flujos de atención (guía rápida)" },
   "É um roteiro de perguntas que a IA segue durante a conversa: ela pergunta uma coisa por vez, entende a resposta e guarda o dado no cadastro do cliente.": { es: "Es un guion de preguntas que la IA sigue durante la conversación: pregunta una cosa a la vez, entiende la respuesta y guarda el dato en el registro del cliente." },
   "Montando o roteiro": { es: "Armando el guion" },
@@ -14186,6 +14244,19 @@ export const DICIONARIO: Traducoes = {
   "Excluir tira essas empresas da lista. Em outra busca, elas podem aparecer de novo como novas.": { es: "Eliminar quita estas empresas de la lista. En otra búsqueda pueden aparecer de nuevo como nuevas." },
   "Empresas desmarcadas excluídas.": { es: "Empresas desmarcadas eliminadas." },
   "Esta campanha já criou o contato e o negócio dessas empresas ao iniciar. Desmarcar só impede o envio: elas continuam no funil.": { es: "Esta campaña ya creó el contacto y el negocio de estas empresas al iniciar. Desmarcar solo impide el envío: siguen en el embudo." },
+  // ─── RELATÓRIOS: A ABA "POR ETIQUETA" (#1891) ───
+  "Por etiqueta": { es: "Por etiqueta" },
+  "Abertas": { es: "Abiertas" },
+  "Resolvidas": { es: "Resueltas" },
+  "Espera média": { es: "Espera media" },
+  "Fatia": { es: "Proporción" },
+  "etiquetagem": { es: "etiquetado" },
+  "etiquetagens": { es: "etiquetados" },
+  "Nenhuma etiqueta em uso": { es: "Ninguna etiqueta en uso" },
+  "Nenhuma conversa com etiqueta neste período": { es: "Ninguna conversación con etiqueta en este período" },
+  "Aplique etiquetas às conversas ou aumente o período — é por etiqueta que se vê qual assunto ocupa a operação.": { es: "Aplica etiquetas a las conversaciones o amplía el período: es por etiqueta cómo se ve qué asunto ocupa la operación." },
+  "O que mais ocupou a operação": { es: "Lo que más ocupó la operación" },
+  "O período passou do limite de leitura: os números contam só as conversas mais recentes.": { es: "El período superó el límite de lectura: los números cuentan solo las conversaciones más recientes." },
 };
 
 /**
