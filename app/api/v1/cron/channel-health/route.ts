@@ -164,7 +164,11 @@ async function handle(req: NextRequest): Promise<Response> {
         const agora = new Date().toISOString();
         await admin
           .from("channel_sessions")
-          .update({ status: saude.status, last_status_change_at: agora })
+          // `saude.detail` é o motivo que o adapter já apurou (ex.: `meta_100_33`,
+          // `conta_em_erro`) — sem gravá-lo aqui, toda queda chegava à Central e
+          // ao banco como `status_reason` vazio, e quem lê ficava sem saber o
+          // porquê mesmo quando o provider respondia com um código específico.
+          .update({ status: saude.status, status_reason: saude.detail, last_status_change_at: agora })
           .eq("id", s.id)
           .eq("organization_id", s.organization_id);
       }
