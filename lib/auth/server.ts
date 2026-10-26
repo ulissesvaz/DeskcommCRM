@@ -9,8 +9,10 @@ import { combinarInterfaces } from "@/lib/navigation/interface";
  * and then filter by `user_id` (a trusted source).
  */
 import { readSupportContext } from "@/lib/impersonate/support";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { agindoPeloPoderDePlataforma } from "@/lib/auth/poder-de-plataforma";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/auth/safe-next";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -134,12 +136,33 @@ export function ehSessaoAusente(error: { name?: string } | null | undefined): bo
   return error?.name === "AuthSessionMissingError";
 }
 
-export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
+/**
+ * O `getUser()` da requisição: UMA ida ao servidor de autenticação, partilhada
+ * por `loadAuthUser` e `isMfaEnrolled`.
+ *
+ * Cada tela de `/app` pedia o usuário ao GoTrue duas vezes — uma aqui, outra
+ * dentro do `listFactors()` do auth-js, que chama `getUser()` pela rede e só
+ * filtra `user.factors`. A resposta é a mesma; a segunda ida era uma espera a
+ * mais (e uma linha a mais no log do Supabase) em toda tela.
+ *
+ * O CLIENTE vai junto com a resposta, e não por enfeite: se o `getUser`
+ * renovou o token, é este cliente que tem o token novo — as consultas de
+ * `loadAuthUser` precisam sair dele, como sempre saíram.
+ */
+const sessaoDaRequisicao = cache(async () => {
   const supabase = await createClient();
+  const resposta = await supabase.auth.getUser();
+  return { supabase, resposta };
+});
+
+export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
   const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+    supabase,
+    resposta: {
+      data: { user },
+      error,
+    },
+  } = await sessaoDaRequisicao();
   // ⚠️ O `error` era DESCARTADO — nem chegava a ser desestruturado —, e aqui
   // `user: null` é tão ambíguo quanto o `data: null` que a query logo abaixo
   // trata com todo o cuidado: significa "não está logado" (estado normal) E
@@ -211,7 +234,7 @@ export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
           // issue #1341 acabou de engordar), e o alias traz só as portas da EMPRESA.
           // `timezone` veio do main (fuso da organização nas listas, #1290) e convive
           // com o alias: um embed por relação, sem renomear o que já existia.
-          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone, currency, country, status, suspended_kind), interface_da_empresa:organizations(interface_settings)",
+          "organization_id, role, interface_settings, accepted_at, organizations!user_organizations_organization_id_fkey(display_name, locale, timezone, currency, country, status, suspended_kind), interface_da_empresa:organizations!user_organizations_organization_id_fkey(interface_settings)",
         )
         .eq("user_id", user.id)
         .is("revoked_at", null)
@@ -395,18 +418,23 @@ export async function requireAuth(): Promise<AuthUser> {
  * Returns true if the current session has at least one verified TOTP factor.
  * Use only in Server Components / Server Actions (cookie session).
  *
- * LANÇA quando não conseguiu ler os fatores. O `listFactors()` do auth-js não
- * lança: ele chama `getUser()` pela rede e, se falhar, DEVOLVE
- * `{ data: null, error }`. Ler só `data` transformava essa falha em "não tem
- * fator" — e `mfaEmDivida` liberava a sessão `aal1` de quem TEM fator. Uma
- * leitura que não aconteceu não pode virar resposta: quem decide acesso falha
- * fechado (a exceção vira 500 na rota, nunca 200).
+ * LANÇA quando não conseguiu ler os fatores. O `getUser()` do auth-js não
+ * lança: se falhar, ele DEVOLVE `{ data: { user: null }, error }`. Ler só
+ * `data` transformava essa falha em "não tem fator" — e `mfaEmDivida` liberava
+ * a sessão `aal1` de quem TEM fator. Uma leitura que não aconteceu não pode
+ * virar resposta: quem decide acesso falha fechado (a exceção vira 500 na rota,
+ * nunca 200).
+ *
+ * Lê `user.factors` da MESMA ida ao GoTrue que `loadAuthUser` já fez
+ * (`sessaoDaRequisicao`), com a regra do `listFactors()` do auth-js 2.117:
+ * fator `totp` com `status === "verified"`.
  */
 export const isMfaEnrolled = cache(async (): Promise<boolean> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.mfa.listFactors();
+  const {
+    resposta: { data, error },
+  } = await sessaoDaRequisicao();
   if (error) throw error;
-  return !!data?.totp?.some((f) => f.status === "verified");
+  return !!data.user?.factors?.some((f) => f.factor_type === "totp" && f.status === "verified");
 });
 
 /**
@@ -553,5 +581,55 @@ export async function mfaEmDivida(): Promise<boolean> {
   //
   // Cadastrar e provar são perguntas diferentes. Quem TEM fator prova, sempre.
   if (!(await isMfaEnrolled())) return false;
+  if ((await sessionAal()) === "aal2") return false;
+  if (await agindoPeloPoderDePlataforma()) return true;
+  // `aal1` com fator: só o banco sabe se esta sessão foi reconhecida por um
+  // dispositivo confiável (`lib/auth/dispositivo-confiavel.ts`). Pergunta à
+  // MESMA função que as definer cobram, para app e banco não divergirem — e
+  // falha fechado: leitura que não aconteceu não vira "provada".
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_session_mfa_proven");
+  if (error) throw error;
+  return data !== true;
+}
+
+/**
+ * A mesma dívida, SEM aceitar dispositivo confiável: quem tem fator precisa do
+ * `aal2` do GoTrue, o código provado nesta sessão. É a régua das rotas da
+ * PLATAFORMA cuja organização vem do path (`/admin/**`, extensões da
+ * instalação), onde a organização ativa não diz nada sobre o alvo.
+ */
+export async function mfaEmDividaEstrita(): Promise<boolean> {
+  if (!(await isMfaEnrolled())) return false;
   return (await sessionAal()) !== "aal2";
+}
+
+/**
+ * O portão de SESSÃO das telas: quem tem fator e não o provou nesta sessão vai
+ * ao desafio, de volta para onde estava. É a mesma pergunta das rotas
+ * (`mfaEmDivida`), para que a tela e as rotas por trás dela respondam igual.
+ *
+ * A régua é a BRANDA de propósito: dispositivo confiável vale em `/app` — com
+ * `mfaEmDividaEstrita` aqui, confiar no dispositivo não teria efeito nenhum. Quem
+ * age pelo poder de plataforma segue devendo o código (`mfaEmDivida` decide), e o
+ * `/admin` tem portão próprio, que exige o `aal2` (`requirePlatformAdmin`).
+ *
+ * Custo: sem fator, ou com `aal2`, nada de novo (`isMfaEnrolled` é `cache` da
+ * requisição e o layout já a pediu; `sessionAal` lê o token). Sessão `aal1` COM
+ * fator faz duas leituras a mais: a org ativa, via `agindoPeloPoderDePlataforma`,
+ * que roda antes para todo platform admin, e o rpc `fn_session_mfa_proven`.
+ * Falha ao ler os fatores LANÇA (o `isMfaEnrolled`), como nas rotas — nenhuma tela
+ * renderiza; erro do rpc também lança.
+ *
+ * `regua`: a tela cujas ações usam a régua ESTRITA (as da instalação em `/app`:
+ * extensões, servidor MCP externo) passa `mfaEmDividaEstrita`. Sem isso, quem
+ * entrou pelo dispositivo confiável abria a tela e recebia `mfa_required` em
+ * toda ação — e entrar de novo não pedia o código.
+ */
+export async function exigirProvaDeMfa(regua: () => Promise<boolean> = mfaEmDivida): Promise<void> {
+  if (!(await regua())) return;
+  // `x-pathname` vem do `proxy.ts`, gravado ANTES do `NextResponse.next` — só o
+  // que existe ali chega aqui (tests/unit/proxy-encaminha-o-caminho.test.ts).
+  const caminho = safeNext((await headers()).get("x-pathname"), "/app");
+  redirect(`/login/mfa?next=${encodeURIComponent(caminho)}`);
 }
