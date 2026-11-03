@@ -471,7 +471,7 @@ export function descreveEvento(
       const ate = quandoLegivel(p.next_eval_at, idioma);
       return {
         titulo: "Segurou o fluxo por causa de um retorno agendado",
-        detalhe: ate ? `volta a andar em ${ate}, um dia depois do retorno` : null,
+        detalhe: ate ? `volta a andar em ${ate}, depois do retorno` : null,
         ...motor,
       };
     }
@@ -611,6 +611,25 @@ export function descreveEvento(
       return {
         titulo: "Cancelado porque o caso foi resolvido",
         detalhe: "o follow-up existia para esse caso e parou junto com ele",
+        ...motor,
+      };
+    // O vínculo do negócio (#3363): a execução do roteiro passou a ter um card
+    // EXPLÍCITO, e o roteiro continua nele até terminar. Sem frase, a escolha
+    // aparecia como "Passo registrado pelo motor, código: roteiro_negocio" — o
+    // nome da variável no lugar do fato, que é o defeito que este arquivo existe
+    // para não ter.
+    case "roteiro_negocio":
+      return {
+        titulo: "Negócio do roteiro definido",
+        detalhe: "as respostas deste roteiro vão para este negócio até ele terminar",
+        ...motor,
+      };
+    case "cancelled_by_stage_change":
+      return {
+        titulo: "Cancelado porque o negócio saiu da etapa",
+        // Sem nome de etapa no detalhe de propósito: o payload guarda o
+        // `to_stage_id`, e um uuid na tela é pior que a frase cobrindo o caso.
+        detalhe: "o toque era da etapa que armou este fluxo, e o card saiu dela",
         ...motor,
       };
     default:
