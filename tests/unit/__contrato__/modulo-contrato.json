@@ -9,7 +9,9 @@
     "agentes_ia",
     "catalogo",
     "configuracao",
-    "analise"
+    "analise",
+    "tarefas",
+    "financeiro"
   ],
   "permissoes": [
     "area.agenda.escrita",
@@ -26,10 +28,14 @@
     "area.contatos.leitura",
     "area.conversas.escrita",
     "area.conversas.leitura",
+    "area.financeiro.escrita",
+    "area.financeiro.leitura",
     "area.funis.escrita",
     "area.funis.leitura",
     "area.negocios.escrita",
-    "area.negocios.leitura"
+    "area.negocios.leitura",
+    "area.tarefas.escrita",
+    "area.tarefas.leitura"
   ],
   "rotas": {
     "agenda": [
@@ -85,6 +91,7 @@
       "GET /api/v1/ai/cases",
       "GET /api/v1/ai/cases/[id]",
       "GET /api/v1/ai/cases/[id]/chat",
+      "GET /api/v1/ai/credit-health",
       "GET /api/v1/ai/evolution",
       "GET /api/v1/ai/followup-flows",
       "GET /api/v1/ai/followup-flows/[id]",
@@ -219,6 +226,7 @@
       "GET /api/v1/attendants/sectors",
       "GET /api/v1/settings/atendimento",
       "GET /api/v1/settings/campanhas",
+      "GET /api/v1/settings/links-de-contato",
       "GET /api/v1/settings/proposal-templates",
       "GET /api/v1/settings/proposal-templates/[id]",
       "GET /api/v1/settings/proposals",
@@ -233,6 +241,7 @@
       "PATCH /api/v1/settings/atendimento",
       "PATCH /api/v1/settings/campanhas",
       "PATCH /api/v1/settings/catalogo",
+      "PATCH /api/v1/settings/links-de-contato",
       "PATCH /api/v1/settings/proposal-templates/[id]",
       "PATCH /api/v1/settings/proposals",
       "PATCH /api/v1/settings/prospeccao",
@@ -333,6 +342,7 @@
       "POST /api/v1/messages/[id]/hide",
       "PUT /api/v1/conversations/[id]/sector"
     ],
+    "financeiro": [],
     "funis": [
       "DELETE /api/v1/pipelines/[id]",
       "DELETE /api/v1/pipelines/[id]/stages/[id]",
@@ -342,6 +352,7 @@
       "GET /api/v1/pipelines",
       "GET /api/v1/pipelines/[id]/agent-mapping",
       "GET /api/v1/pipelines/[id]/forecast",
+      "GET /api/v1/pipelines/[id]/negocios",
       "GET /api/v1/pipelines/[id]/stages",
       "GET /api/v1/pipelines/[id]/stages/win-rates",
       "GET /api/v1/pipelines/default",
@@ -349,6 +360,7 @@
       "PATCH /api/v1/pipelines/[id]",
       "PATCH /api/v1/pipelines/[id]/stages/[id]",
       "POST /api/v1/pipelines",
+      "POST /api/v1/pipelines/[id]/negocios",
       "POST /api/v1/pipelines/[id]/stages",
       "POST /api/v1/pipelines/importar",
       "PUT /api/v1/pipelines/[id]/agent-mapping"
@@ -406,7 +418,8 @@
       "POST /api/v1/proposals/[id]/decide",
       "POST /api/v1/proposals/[id]/preencher-com-conversa",
       "POST /api/v1/proposals/[id]/revise"
-    ]
+    ],
+    "tarefas": []
   },
   "formatos": {
     "/api/v1/agenda/agendamentos": {
@@ -544,7 +557,7 @@
         {
           "nome": "alterarSchema",
           "origem": "@/lib/agenda/tipos-de-agendamento",
-          "hash": "6245f5adcb258277"
+          "hash": "8b29d78104f1e902"
         },
         {
           "nome": "criarComRascunhoSchema",
@@ -1154,7 +1167,7 @@
         {
           "nome": "listConversationsQuerySchema",
           "origem": "@/lib/schemas",
-          "hash": "19cf1a29d188dca0"
+          "hash": "92d560e6e1b357dd"
         }
       ],
       "resposta": []
@@ -1469,6 +1482,16 @@
       ],
       "resposta": []
     },
+    "/api/v1/pipelines/[id]/negocios": {
+      "corpo": [
+        {
+          "nome": "bodySchema",
+          "origem": "local",
+          "hash": "5ad9070ac9aad5a9"
+        }
+      ],
+      "resposta": []
+    },
     "/api/v1/pipelines/[id]/stages": {
       "corpo": [
         {
@@ -1740,6 +1763,16 @@
           "nome": "patchSchema",
           "origem": "local",
           "hash": "74c95be5b1a8424d"
+        }
+      ],
+      "resposta": []
+    },
+    "/api/v1/settings/links-de-contato": {
+      "corpo": [
+        {
+          "nome": "patchSchema",
+          "origem": "local",
+          "hash": "0a53a4ee909f3cec"
         }
       ],
       "resposta": []
